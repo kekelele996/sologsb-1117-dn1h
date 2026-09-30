@@ -66,13 +66,13 @@ sologsb-1117/
 │   ├── nginx.conf              # try_files 前端路由回落 + gzip
 │   ├── public/favicon.svg
 │   └── src/
-│       ├── types/              # orchard.ts / colony.ts / droppoint.ts / route.ts / index.ts
-│       ├── stores/             # orchardStore / colonyStore / droppointStore / routeStore（Zustand）
+│       ├── types/              # orchard.ts / colony.ts / droppoint.ts / route.ts / plan.ts / index.ts
+│       ├── stores/             # orchardStore / colonyStore / droppointStore / routeStore / planStore / appStore（Zustand）
 │       ├── components/common/  # RouteMap / FlowerWindowBar / StatusTag / CoordPicker
 │       ├── hooks/              # useAmap / usePersistentStore
-│       ├── pages/              # SchedulePage / OrchardsPage / ColoniesPage / RoutesPage / ExportPage
+│       ├── pages/              # SchedulePage / PlanPage / OrchardsPage / ColoniesPage / RoutesPage / MergePage / ExportPage
 │       ├── router/index.tsx
-│       └── utils/              # geo.ts / export.ts / id.ts
+│       └── utils/              # geo.ts / export.ts / id.ts / merge.ts
 ```
 
 ## 六、数据模型与存储
@@ -83,9 +83,12 @@ sologsb-1117/
 | BeeColony 蜂群 | 群号、蜂种、群势（足框）、箱型、当前所在地块、状态（待投放/在园/转场中/回场）、最近检查日期、健康备注 | `colonies` |
 | DropPoint 投放点 | 所属地块、坐标、编号、可容纳箱数、遮阴条件、水源距离、投放时间窗、撤场时间、责任人、安排群号 | `dropPoints` |
 | TransitRoute 转场路线 | 出发/到达投放点、预计里程与耗时、车辆类型、出发时刻、风险备注、实际记录 | `routes` |
+| SeasonPlan 排季安排 | 方案名、参与地块/蜂群、已安排（蜂群→投放点）、排队、投放点缺口、地块授粉缺口、状态（valid/invalid）、引用指纹 | `plans` |
 
 - 数据库名 `gbbeeroute`，`meta` 表保存 `schemaVersion`；
 - `version(2)` 升级迁移会为历史投放点补齐「可容纳箱数」（默认 8 箱）；
+- `version(3)` 新增「排季安排」表（仅加表，不触碰既有数据，升级零丢失）；
+- 启动时校验五张核心表可读且记录完整，升级后地块、蜂群、投放点、路线一条不丢；
 - 数据仅存于浏览器本地，容器无状态、不挂载命名卷。
 
 ## 七、主要页面
@@ -93,13 +96,18 @@ sologsb-1117/
 | 路由 | 功能 |
 | --- | --- |
 | `/` | 季内授粉安排总表：花期条带 + 已投放群体，冲突（同一蜂群被排入花期重叠的不同地块）标红并汇总 |
+| `/plans` | 排季安排：挑好地块与蜂群后按投放点容量自动排蜂，排不下的进排队，并标明哪个点还差几箱；地块花期或投放点坐标/容量改动后方案失效，需重算后才能导出 |
 | `/orchards` | 果园地块管理：面积与需蜂强度自动算建议箱数、可达性标记、花期重叠提示、投放点维护（含坐标拾取） |
 | `/colonies` | 蜂群台账：按群势与状态筛选，批量改状态、批量记录检查备注 |
 | `/routes` | 转场路线规划：地图依次选点生成顺序与里程，拖动或上下移动调整顺序并实时重算，写回路线表 |
-| `/export` | 导出授粉安排清单 / 转场路线表（CSV）、全量 JSON 备份，并提供横向/纵向打印视图 |
+| `/merge` | 离线合并：外勤导出离线包，回驻地按编号合并；两边都动过的行先列出来复核，确认采用哪一版后写回 |
+| `/export` | 导出授粉安排清单 / 转场路线表（CSV）、全量 JSON 备份，并提供横向/纵向打印视图；方案失效时给出提示 |
 
 ## 八、计算约定
 
 - 建议箱数 = ⌈面积(亩) × 需蜂强度(箱/亩)⌉，最少 1 箱；
 - 转场里程按 Haversine 球面距离累计，耗时按平均 32 km/h + 0.25 h 装卸估算；
-- 花期重叠：两地块盛花期区间交集天数 ≥ 1 即视为重叠；同一群号在重叠期内被排入两个地块 → 冲突。
+- 花期重叠：两地块盛花期区间交集天数 ≥ 1 即视为重叠；同一群号在重叠期内被排入两个地块 → 冲突；
+- 排季安排：按投放点可容纳箱数排蜂，排不下的进排队并说明原因；投放点缺口 = 容量 − 已放（该点还可再放几箱），地块授粉缺口 = 建议箱数 − 已放；
+- 方案指纹 = 引用地块的花期起止 + 引用投放点的坐标/容量；任一变动即判失效，需重算后才能导出为可执行方案；
+- 离线合并：按编号逐行比对，两边都改过的标为冲突并优先列出，复核时选择采用外勤版或本地版。

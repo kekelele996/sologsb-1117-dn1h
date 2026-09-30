@@ -1,22 +1,23 @@
 import { useStore } from 'zustand'
 import type { StoreApi, UseBoundStore } from 'zustand'
 import Dexie, { type Table } from 'dexie'
-import type { BeeColony, DropPoint, Orchard, TransitRoute } from '@/types'
+import type { BeeColony, DropPoint, Orchard, SeasonPlan, TransitRoute } from '@/types'
 
 /** IndexedDB 数据结构版本号 */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 export interface MetaRow {
   key: string
   value: number
 }
 
-/** Dexie 封装：果园 / 蜂群 / 投放点 / 转场路线 四张表 + 元数据表 */
+/** Dexie 封装：果园 / 蜂群 / 投放点 / 转场路线 / 排季安排 五张表 + 元数据表 */
 class BeeRouteDb extends Dexie {
   orchards!: Table<Orchard, string>
   colonies!: Table<BeeColony, string>
   dropPoints!: Table<DropPoint, string>
   routes!: Table<TransitRoute, string>
+  plans!: Table<SeasonPlan, string>
   meta!: Table<MetaRow, string>
 
   constructor() {
@@ -29,7 +30,7 @@ class BeeRouteDb extends Dexie {
       meta: 'key'
     })
     // v2：投放点新增「可容纳箱数」字段，迁移时为历史投放点补齐（按 8 箱兜底）
-    this.version(SCHEMA_VERSION)
+    this.version(2)
       .stores({
         orchards: 'id, name, crop, bloomStart',
         colonies: 'id, code, status, currentOrchardId',
@@ -47,6 +48,15 @@ class BeeRouteDb extends Dexie {
             }
           })
       })
+    // v3：新增「排季安排」表（仅加表，不触碰既有数据，升级零丢失）
+    this.version(SCHEMA_VERSION).stores({
+      orchards: 'id, name, crop, bloomStart',
+      colonies: 'id, code, status, currentOrchardId',
+      dropPoints: 'id, orchardId, code, dropWindow',
+      routes: 'id, fromDropId, toDropId, departAt',
+      plans: 'id, name, status, updatedAt',
+      meta: 'key'
+    })
   }
 }
 
@@ -55,6 +65,48 @@ export const db = new BeeRouteDb()
 /** 写入当前数据结构版本号 */
 export async function stampDbVersion(): Promise<void> {
   await db.meta.put({ key: 'schemaVersion', value: SCHEMA_VERSION })
+}
+
+export interface TableIntegrity {
+  name: string
+  label: string
+  count: number
+  ok: boolean
+}
+
+export interface IntegrityReport {
+  ok: boolean
+  schemaVersion: number
+  tables: TableIntegrity[]
+  message: string
+}
+
+/** 启动时校验四张核心表可读且记录完整（升级后一条不丢） */
+export async function verifyDataIntegrity(): Promise<IntegrityReport> {
+  const defs: { name: string; label: string; table: Table<unknown, string> }[] = [
+    { name: 'orchards', label: '地块', table: db.orchards },
+    { name: 'colonies', label: '蜂群', table: db.colonies },
+    { name: 'dropPoints', label: '投放点', table: db.dropPoints },
+    { name: 'routes', label: '转场路线', table: db.routes },
+    { name: 'plans', label: '排季安排', table: db.plans }
+  ]
+  const tables: TableIntegrity[] = []
+  let ok = true
+  for (const def of defs) {
+    try {
+      const count = await def.table.count()
+      tables.push({ name: def.name, label: def.label, count, ok: true })
+    } catch {
+      tables.push({ name: def.name, label: def.label, count: 0, ok: false })
+      ok = false
+    }
+  }
+  return {
+    ok,
+    schemaVersion: SCHEMA_VERSION,
+    tables,
+    message: ok ? '核心表完整，升级未丢失任何记录' : '部分表读取异常，请检查浏览器存储'
+  }
 }
 
 /** 读取整表 */

@@ -1,18 +1,21 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Layout, Menu, Statistic, Typography } from 'antd'
+import { Layout, Menu, Statistic, Tag, Typography } from 'antd'
 import { usePersistentStore } from '@/hooks/usePersistentStore'
 import { orchardStore } from '@/stores/orchardStore'
 import { colonyStore } from '@/stores/colonyStore'
 import { droppointStore } from '@/stores/droppointStore'
 import { routeStore } from '@/stores/routeStore'
+import { planStore } from '@/stores/planStore'
 
 const { Sider, Header, Content } = Layout
 
 const NAV = [
   { key: '/', label: '季内授粉安排总表' },
+  { key: '/plans', label: '排季安排' },
   { key: '/orchards', label: '果园地块管理' },
   { key: '/colonies', label: '蜂群台账' },
   { key: '/routes', label: '转场路线规划' },
+  { key: '/merge', label: '离线合并' },
   { key: '/export', label: '导出与打印' }
 ]
 
@@ -22,6 +25,8 @@ export default function AppLayout(): JSX.Element {
   const colonies = usePersistentStore(colonyStore, (state) => state.rows)
   const dropPoints = usePersistentStore(droppointStore, (state) => state.rows)
   const routes = usePersistentStore(routeStore, (state) => state.rows)
+  const plans = usePersistentStore(planStore, (state) => state.rows)
+  const invalidCount = plans.filter((plan) => plan.status === 'invalid').length
 
   const totalKm = Math.round(routes.reduce((sum, item) => sum + item.distanceKm, 0) * 100) / 100
 
@@ -48,8 +53,13 @@ export default function AppLayout(): JSX.Element {
           <Statistic title={<span style={{ color: '#a9b3ad', fontSize: 12 }}>已入册地块</span>} value={orchards.length} valueStyle={{ color: '#f2c14e' }} />
           <Statistic title={<span style={{ color: '#a9b3ad', fontSize: 12 }}>蜂群 / 投放点</span>} value={`${colonies.length} / ${dropPoints.length}`} valueStyle={{ color: '#f2c14e', fontSize: 18 }} />
           <Statistic title={<span style={{ color: '#a9b3ad', fontSize: 12 }}>转场里程合计</span>} value={`${totalKm} km`} valueStyle={{ color: '#f2c14e', fontSize: 18 }} />
+          <div style={{ marginTop: 12 }}>
+            <Tag color={invalidCount > 0 ? 'red' : 'green'}>
+              排季安排 {plans.length} 份{invalidCount > 0 ? ` · ${invalidCount} 份失效` : ''}
+            </Tag>
+          </div>
           <Typography.Paragraph style={{ color: '#7f8d82', fontSize: 11, marginTop: 12, marginBottom: 0 }}>
-            数据保存在浏览器 IndexedDB，无需后端服务
+            数据保存在浏览器 IndexedDB，升级不丢地块 / 蜂群 / 投放点 / 路线
           </Typography.Paragraph>
         </div>
       </Sider>

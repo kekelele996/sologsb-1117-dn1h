@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Button, Card, Col, Radio, Row, Space, Table, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Col, Radio, Row, Space, Table, Tag, Typography, message } from 'antd'
 import dayjs from 'dayjs'
 import type { BeeColony, DropPoint, Orchard, TransitRoute } from '@/types'
 import { suggestColonyBoxes } from '@/types'
@@ -8,6 +8,8 @@ import { orchardStore } from '@/stores/orchardStore'
 import { colonyStore } from '@/stores/colonyStore'
 import { droppointStore } from '@/stores/droppointStore'
 import { routeStore } from '@/stores/routeStore'
+import { planStore } from '@/stores/planStore'
+import { appStore } from '@/stores/appStore'
 import { downloadCsv, downloadJson } from '@/utils/export'
 import { bloomDays } from '@/utils/geo'
 
@@ -31,7 +33,11 @@ export default function ExportPage(): JSX.Element {
   const colonies = usePersistentStore(colonyStore, (state) => state.rows)
   const dropPoints = usePersistentStore(droppointStore, (state) => state.rows)
   const routes = usePersistentStore(routeStore, (state) => state.rows)
+  const plans = usePersistentStore(planStore, (state) => state.rows)
+  const integrity = usePersistentStore(appStore, (state) => state.integrity)
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('landscape')
+
+  const invalidPlans = plans.filter((plan) => plan.status === 'invalid')
 
   const orchardName = (id: string): string => orchards.find((item) => item.id === id)?.name ?? '未知地块'
 
@@ -136,9 +142,10 @@ export default function ExportPage(): JSX.Element {
       orchards,
       colonies,
       dropPoints,
-      routes
+      routes,
+      plans
     })
-    message.success('全量数据已导出为 JSON 备份')
+    message.success('全量数据已导出为 JSON 备份（含排季安排）')
   }
 
   return (
@@ -159,6 +166,32 @@ export default function ExportPage(): JSX.Element {
           <Button onClick={() => window.print()}>打印视图</Button>
         </Space>
       </div>
+
+      {invalidPlans.length > 0 ? (
+        <Alert
+          type="warning"
+          showIcon
+          message={`有 ${invalidPlans.length} 份排季安排已失效，不可作为可执行方案导出`}
+          description="地块花期或投放点坐标/容量已变动，请先到「排季安排」页重算，再导出可执行方案。下方授粉安排清单与转场路线表由实时数据生成，不受影响。"
+        />
+      ) : null}
+
+      <Card size="small" title="数据安全（升级不丢数据）">
+        <Space wrap>
+          <Tag color={integrity?.ok ? 'green' : 'red'}>
+            {integrity?.ok ? '核心表完整' : '数据异常'}
+          </Tag>
+          <Tag>数据结构版本 v{integrity?.schemaVersion ?? '—'}</Tag>
+          {integrity?.tables.map((table) => (
+            <Tag key={table.name} color={table.ok ? 'default' : 'red'}>
+              {table.label} {table.count} 条
+            </Tag>
+          ))}
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            升级仅新增表与字段，不删除既有记录；地块、蜂群、投放点、转场路线一条都不会丢。
+          </Typography.Text>
+        </Space>
+      </Card>
 
       <Card size="small">
         <Space wrap>
