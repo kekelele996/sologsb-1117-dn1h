@@ -5,3 +5,15 @@ export type { BeeColony, BeeSpecies, ColonyStatus, BoxType } from './colony'
 export type { DropPoint } from './droppoint'
 export { VEHICLE_TYPES } from './route'
 export type { TransitRoute, VehicleType } from './route'
+export type {
+  SeasonPlan,
+  PlanInput,
+  PlanStatus,
+  PlanValidity,
+  PlanAssignment,
+  PlanQueueItem,
+  PlanPointStat,
+  PlanOrchardStat,
+  PlanSnapshots,
+  PlanBuildContext
+} from './seasonPlan'

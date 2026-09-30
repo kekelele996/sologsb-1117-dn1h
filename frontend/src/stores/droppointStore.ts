@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { DropPoint } from '@/types'
-import { db, deleteRow, loadAll, putRow } from '@/hooks/usePersistentStore'
+import { db, deleteRow, loadAll, nowStamp, putRow } from '@/hooks/usePersistentStore'
 
 export interface DropPointState {
   rows: DropPoint[]
@@ -20,7 +20,7 @@ export const droppointStore = create<DropPointState>((set, get) => ({
     set({ rows, loaded: true })
   },
   save: async (row) => {
-    await putRow<DropPoint>(db.dropPoints, row)
+    await putRow<DropPoint>(db.dropPoints, { ...row, updatedAt: nowStamp() })
     await get().hydrate()
   },
   remove: async (id) => {

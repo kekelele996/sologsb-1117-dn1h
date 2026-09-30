@@ -20,4 +20,6 @@ export interface DropPoint {
   owner: string
   /** 该投放点安排的群号（用于冲突判定） */
   colonyCodes: string[]
+  /** 最近修改时间（ISO），离线合并时用于变更识别；页面新建可不填，入库时自动补 */
+  updatedAt?: string
 }

@@ -28,6 +28,8 @@ export interface Orchard {
   /** 历史授粉年份 */
   historyYears: number[]
   note: string
+  /** 最近修改时间（ISO），离线合并时用于变更识别；页面新建可不填，入库时自动补 */
+  updatedAt?: string
 }
 
 /** 由面积与需蜂强度算出建议箱数（向上取整，最少 1 箱） */

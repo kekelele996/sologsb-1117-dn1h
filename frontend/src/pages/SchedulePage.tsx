@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Alert, Card, Col, Row, Segmented, Space, Table, Tag, Typography } from 'antd'
 import type { BeeColony, DropPoint, Orchard } from '@/types'
 import FlowerWindowBar from '@/components/common/FlowerWindowBar'
@@ -9,6 +10,8 @@ import { orchardStore } from '@/stores/orchardStore'
 import { colonyStore } from '@/stores/colonyStore'
 import { droppointStore } from '@/stores/droppointStore'
 import { routeStore } from '@/stores/routeStore'
+import { seasonPlanStore } from '@/stores/seasonPlanStore'
+import { checkPlanStale } from '@/utils/planValidity'
 import { bloomDays, flowerWindowOverlap } from '@/utils/geo'
 import { suggestColonyBoxes } from '@/types'
 
@@ -44,7 +47,16 @@ export default function SchedulePage(): JSX.Element {
   const colonies = usePersistentStore(colonyStore, (state) => state.rows)
   const dropPoints = usePersistentStore(droppointStore, (state) => state.rows)
   const routes = usePersistentStore(routeStore, (state) => state.rows)
+  const plans = usePersistentStore(seasonPlanStore, (state) => state.rows)
   const [scope, setScope] = useState<'all' | 'conflict'>('all')
+
+  const stalePlans = useMemo(
+    () =>
+      plans.filter(
+        (plan) => checkPlanStale(plan, { orchards, colonies, dropPoints }).validity === 'stale'
+      ),
+    [plans, orchards, colonies, dropPoints]
+  )
 
   /** 由投放点的群号安排 + 蜂群当前所在地块，汇总出「某群在某地块」的时间占用 */
   const placements = useMemo<Placement[]>(() => {
@@ -138,6 +150,17 @@ export default function SchedulePage(): JSX.Element {
           ]}
         />
       </div>
+
+      {stalePlans.length > 0 ? (
+        <Alert
+          type="warning"
+          showIcon
+          message={`有 ${stalePlans.length} 份排季安排因地块花期或投放点坐标等依据变动而失效，重算前不能作为可执行方案导出`}
+          description={
+            <Link to="/plans">前往「排季安排」查看失效原因并重新计算 →</Link>
+          }
+        />
+      ) : null}
 
       {conflicts.length > 0 ? (
         <Alert

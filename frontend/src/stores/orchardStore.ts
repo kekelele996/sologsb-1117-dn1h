@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Orchard } from '@/types'
-import { db, deleteRow, loadAll, putRow } from '@/hooks/usePersistentStore'
+import { db, deleteRow, loadAll, nowStamp, putRow } from '@/hooks/usePersistentStore'
 
 export interface OrchardState {
   rows: Orchard[]
@@ -19,7 +19,7 @@ export const orchardStore = create<OrchardState>((set, get) => ({
     set({ rows, loaded: true })
   },
   save: async (row) => {
-    await putRow<Orchard>(db.orchards, row)
+    await putRow<Orchard>(db.orchards, { ...row, updatedAt: nowStamp() })
     await get().hydrate()
   },
   remove: async (id) => {

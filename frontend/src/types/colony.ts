@@ -26,4 +26,6 @@ export interface BeeColony {
   lastCheckDate: string
   /** 蜂群健康备注 */
   healthNote: string
+  /** 最近修改时间（ISO），离线合并时用于变更识别；页面新建可不填，入库时自动补 */
+  updatedAt?: string
 }

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { BeeColony, ColonyStatus } from '@/types'
-import { db, deleteRow, loadAll, putRow } from '@/hooks/usePersistentStore'
+import { db, deleteRow, loadAll, nowStamp, putRow } from '@/hooks/usePersistentStore'
 
 export interface ColonyState {
   rows: BeeColony[]
@@ -21,7 +21,7 @@ export const colonyStore = create<ColonyState>((set, get) => ({
     set({ rows, loaded: true })
   },
   save: async (row) => {
-    await putRow<BeeColony>(db.colonies, row)
+    await putRow<BeeColony>(db.colonies, { ...row, updatedAt: nowStamp() })
     await get().hydrate()
   },
   remove: async (id) => {
@@ -29,13 +29,17 @@ export const colonyStore = create<ColonyState>((set, get) => ({
     await get().hydrate()
   },
   bulkSetStatus: async (ids, status) => {
+    const stamp = nowStamp()
     const targets = get().rows.filter((row) => ids.includes(row.id))
-    await Promise.all(targets.map((row) => putRow<BeeColony>(db.colonies, { ...row, status })))
+    await Promise.all(targets.map((row) => putRow<BeeColony>(db.colonies, { ...row, status, updatedAt: stamp })))
     await get().hydrate()
   },
   bulkSetHealthNote: async (ids, note, checkDate) => {
+    const stamp = nowStamp()
     const targets = get().rows.filter((row) => ids.includes(row.id))
-    await Promise.all(targets.map((row) => putRow<BeeColony>(db.colonies, { ...row, healthNote: note, lastCheckDate: checkDate })))
+    await Promise.all(
+      targets.map((row) => putRow<BeeColony>(db.colonies, { ...row, healthNote: note, lastCheckDate: checkDate, updatedAt: stamp }))
+    )
     await get().hydrate()
   }
 }))

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { TransitRoute } from '@/types'
-import { db, deleteRow, loadAll, putRow } from '@/hooks/usePersistentStore'
+import { db, deleteRow, loadAll, nowStamp, putRow } from '@/hooks/usePersistentStore'
 import { distanceKm, estimateDurationH } from '@/utils/geo'
 
 export interface RouteState {
@@ -25,7 +25,7 @@ export const routeStore = create<RouteState>((set, get) => ({
     set({ rows, loaded: true })
   },
   save: async (row) => {
-    await putRow<TransitRoute>(db.routes, row)
+    await putRow<TransitRoute>(db.routes, { ...row, updatedAt: nowStamp() })
     await get().hydrate()
   },
   remove: async (id) => {
@@ -33,6 +33,7 @@ export const routeStore = create<RouteState>((set, get) => ({
     await get().hydrate()
   },
   rebuildFromOrder: async (orderedDropIds, meta) => {
+    const stamp = nowStamp()
     const existing = await loadAll<TransitRoute>(db.routes)
     await Promise.all(existing.map((row) => deleteRow<TransitRoute>(db.routes, row.id)))
     const points = await loadAll<{ id: string; longitude: number; latitude: number }>(db.dropPoints)
@@ -51,7 +52,8 @@ export const routeStore = create<RouteState>((set, get) => ({
         vehicleType: meta.vehicleType,
         departAt: meta.departAt,
         riskNote: meta.riskNote,
-        actualNote: '待执行'
+        actualNote: '待执行',
+        updatedAt: stamp
       })
     }
     await get().hydrate()

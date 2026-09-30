@@ -5,14 +5,18 @@ import { orchardStore } from '@/stores/orchardStore'
 import { colonyStore } from '@/stores/colonyStore'
 import { droppointStore } from '@/stores/droppointStore'
 import { routeStore } from '@/stores/routeStore'
+import { seasonPlanStore } from '@/stores/seasonPlanStore'
+import { checkPlanStale } from '@/utils/planValidity'
 
 const { Sider, Header, Content } = Layout
 
 const NAV = [
   { key: '/', label: '季内授粉安排总表' },
+  { key: '/plans', label: '排季安排' },
   { key: '/orchards', label: '果园地块管理' },
   { key: '/colonies', label: '蜂群台账' },
   { key: '/routes', label: '转场路线规划' },
+  { key: '/sync', label: '外勤离线合并' },
   { key: '/export', label: '导出与打印' }
 ]
 
@@ -22,8 +26,12 @@ export default function AppLayout(): JSX.Element {
   const colonies = usePersistentStore(colonyStore, (state) => state.rows)
   const dropPoints = usePersistentStore(droppointStore, (state) => state.rows)
   const routes = usePersistentStore(routeStore, (state) => state.rows)
+  const plans = usePersistentStore(seasonPlanStore, (state) => state.rows)
 
   const totalKm = Math.round(routes.reduce((sum, item) => sum + item.distanceKm, 0) * 100) / 100
+  const stalePlanCount = plans.filter(
+    (plan) => checkPlanStale(plan, { orchards, colonies, dropPoints }).validity === 'stale'
+  ).length
 
   return (
     <Layout className="app-shell">
@@ -41,12 +49,20 @@ export default function AppLayout(): JSX.Element {
           selectedKeys={[window.location.pathname]}
           items={NAV.map((item) => ({
             key: item.key,
-            label: <NavLink to={item.key}>{item.label}</NavLink>
+            label: (
+              <span>
+                <NavLink to={item.key}>{item.label}</NavLink>
+                {item.key === '/plans' && stalePlanCount > 0 ? (
+                  <Typography.Text style={{ color: '#ff7875', fontSize: 11, marginLeft: 8 }}>{stalePlanCount} 待重算</Typography.Text>
+                ) : null}
+              </span>
+            )
           }))}
         />
         <div style={{ padding: 16 }}>
           <Statistic title={<span style={{ color: '#a9b3ad', fontSize: 12 }}>已入册地块</span>} value={orchards.length} valueStyle={{ color: '#f2c14e' }} />
           <Statistic title={<span style={{ color: '#a9b3ad', fontSize: 12 }}>蜂群 / 投放点</span>} value={`${colonies.length} / ${dropPoints.length}`} valueStyle={{ color: '#f2c14e', fontSize: 18 }} />
+          <Statistic title={<span style={{ color: '#a9b3ad', fontSize: 12 }}>排季方案</span>} value={`${plans.length}${stalePlanCount > 0 ? `（${stalePlanCount} 失效）` : ''}`} valueStyle={{ color: stalePlanCount > 0 ? '#ff7875' : '#f2c14e', fontSize: 18 }} />
           <Statistic title={<span style={{ color: '#a9b3ad', fontSize: 12 }}>转场里程合计</span>} value={`${totalKm} km`} valueStyle={{ color: '#f2c14e', fontSize: 18 }} />
           <Typography.Paragraph style={{ color: '#7f8d82', fontSize: 11, marginTop: 12, marginBottom: 0 }}>
             数据保存在浏览器 IndexedDB，无需后端服务

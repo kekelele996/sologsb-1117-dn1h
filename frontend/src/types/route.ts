@@ -20,4 +20,6 @@ export interface TransitRoute {
   riskNote: string
   /** 实际转场记录 */
   actualNote: string
+  /** 最近修改时间（ISO），离线合并时用于变更识别；页面新建可不填，入库时自动补 */
+  updatedAt?: string
 }
